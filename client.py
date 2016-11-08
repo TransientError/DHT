@@ -1,14 +1,14 @@
 #!/usr/bin/python
-
+"""Client code modified from phase 2."""
 
 import argparse
 import common
 import common2
-import random
 import time
 
-# Client entry point
+
 def main():
+    """Client entry point."""
     parser = argparse.ArgumentParser()
     parser.add_argument('--server', default='localhost')
     parser.add_argument('--viewleader', default='localhost')
@@ -29,18 +29,21 @@ def main():
     parser_server_query = subparsers.add_parser('query_servers')
 
     parser_lock_get = subparsers.add_parser('lock_get')
-    parser_lock_get.add_argument('lockid', type=str)    
-    parser_lock_get.add_argument('requestor', type=str)    
+    parser_lock_get.add_argument('lockid', type=str)
+    parser_lock_get.add_argument('requestor', type=str)
 
     parser_lock_get = subparsers.add_parser('lock_release')
-    parser_lock_get.add_argument('lockid', type=str)    
-    parser_lock_get.add_argument('requestor', type=str)    
+    parser_lock_get.add_argument('lockid', type=str)
+    parser_lock_get.add_argument('requestor', type=str)
 
     args = parser.parse_args()
 
     if args.cmd in ['query_servers', 'lock_get', 'lock_release']:
         while True:
-            response = common.send_receive_range(args.viewleader, common2.VIEWLEADER_LOW, common2.VIEWLEADER_HIGH, vars(args))
+            response = common.send_receive_range(args.viewleader,
+                                                 common2.VIEWLEADER_LOW,
+                                                 common2.VIEWLEADER_HIGH,
+                                                 vars(args))
             if response.get("status") == "retry":
                 print "Waiting on lock %s..." % args.lockid
                 time.sleep(5)
@@ -49,8 +52,9 @@ def main():
                 break
         print response
     else:
-        response = common.send_receive_range(args.server, common2.SERVER_LOW, common2.SERVER_HIGH, vars(args))
+        response = common.send_receive_range(args.server, common2.SERVER_LOW,
+                                             common2.SERVER_HIGH, vars(args))
         print response
 
 if __name__ == "__main__":
-    main()    
+    main()

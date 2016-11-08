@@ -1,4 +1,5 @@
 #!/usr/bin/python
+"""Server code modified from phase 2."""
 
 import common
 import common2
@@ -18,23 +19,25 @@ config = {"epoch": None,
 # Stores shared values for get and se commands
 store = {}
 
-# Request or extend a lease from view leaer
+
 def update_lease():
+    """Request or extend a lease from viewleader."""
     if config["port"] is None:
         return {}
     config["last_heartbeat"] = time.time()
-    res = common.send_receive_range(config["viewleader"], common2.VIEWLEADER_LOW , 
-        common2.VIEWLEADER_HIGH , {
-            "cmd": "heartbeat",
-            "port": config["port"],
-            "requestor": config["server_hash"],
-        })
+    res = common.send_receive_range(config["viewleader"],
+                                    common2.VIEWLEADER_LOW,
+                                    common2.VIEWLEADER_HIGH,
+                                    {"cmd": "heartbeat",
+                                     "port": config["port"],
+                                     "requestor": config["server_hash"]})
     if "error" in res:
         print "Can't update lease: %s" % res["error"]
         return res
     if res.get("status") == 'ok':
         if config["epoch"] is not None and res["epoch"] < config["epoch"]:
-            print "Received invalid epoch (%s < %s)" % (res["epoch"], config["epoch"])
+            print "Received invalid epoch (%s < %s)" % (res["epoch"],
+                                                        config["epoch"])
             return {"error": "bad epoch"}
         else:
             config["epoch"] = res["epoch"]
@@ -46,50 +49,57 @@ def update_lease():
 ###################
 # RPC implementations
 
-# Init function - nop
+
 def init(msg, addr):
+    """Init function - nop."""
     config["port"] = msg["port"]
     update_lease()
     return {}
 
-# set command sets a key in the value store
+
 def set_val(msg, addr):
+    """set command sets a key in the value store."""
     key = msg["key"]
     val = msg["val"]
     store[key] = {"val": val}
     print "Setting key %s to %s in local store" % (key, val)
     return {"status": "ok"}
 
-# fetches a key in the value store
+
 def get_val(msg, addr):
+    """fetch a key in the value store."""
     key = msg["key"]
     if key in store:
         print "Querying stored value of %s" % key
-        return {"status": "ok", "value": store[key]["val"],}
+        return {"status": "ok", "value": store[key]["val"]}
     else:
         print "Stored value of key %s not found" % key
         return {"status": "not_found"}
 
-# Returns all keys in the value store
+
 def query_all_keys(msg, addr):
+    """Return all keys in the value store."""
     print "Returning all keys"
-    keyvers = [ key for key in store.keys() ]
+    keyvers = [key for key in store.keys()]
     return {"result": keyvers}
 
-# Print a message in response to print command
+
 def print_something(msg, addr):
+    """Print a message in response to print command."""
     print "Printing %s" % " ".join(msg["text"])
     return {"status": "ok"}
 
-# accept timed out - nop
+
 def tick(msg, addr):
+    """accept timed out - nop."""
     return {}
 
 ##############
 # Main program
 
-# RPC dispatcher invokes appropriate function
+
 def handler(msg, addr):
+    """RPC dispatcher invokes appropriate function."""
     cmds = {
         "init": init,
         "set": set_val,
@@ -98,7 +108,7 @@ def handler(msg, addr):
         "query_all_keys": query_all_keys,
         "timeout": tick,
     }
-    res =  cmds[msg["cmd"]](msg, addr)
+    res = cmds[msg["cmd"]](msg, addr)
 
     # Conditionally send heartbeat
     if time.time() - config["last_heartbeat"] >= 10:
@@ -106,13 +116,14 @@ def handler(msg, addr):
 
     return res
 
-# Server entry point
+
 def main():
+    """Server entry point."""
     parser = argparse.ArgumentParser()
     parser.add_argument('--viewleader', default='localhost')
     args = parser.parse_args()
     config["viewleader"] = args.viewleader
- 
+
     for port in range(common2.SERVER_LOW, common2.SERVER_HIGH):
         print "Trying to listen on %s..." % port
         result = common.listen(port, handler, 10)

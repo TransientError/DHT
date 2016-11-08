@@ -1,5 +1,7 @@
 #!/usr/bin/python
 
+"""Modified from phase 2."""
+
 import time
 import common
 import common2
@@ -24,8 +26,9 @@ locks = []
 ###################
 # RPC implementations
 
-# Try to acquire a lock
+
 def lock_get(msg, addr):
+    """Try to acquire a lock."""
     lockid = msg["lockid"]
     requestor = msg["requestor"]
     for lock in locks:
@@ -41,11 +44,12 @@ def lock_get(msg, addr):
                 return {"status": "retry"}
     else:
         # this lock doesn't exist yet
-        locks.append({"lockid":lockid, "queue": [requestor]})
+        locks.append({"lockid": lockid, "queue": [requestor]})
         return {"status": "granted"}
 
-# Release a held lock, or remove oneself from waiting queue
+
 def lock_release(msg, addr):
+    """Release a held lock, or remove oneself from waiting queue."""
     lockid = msg["lockid"]
     requestor = msg["requestor"]
     for lock in locks:
@@ -56,8 +60,9 @@ def lock_release(msg, addr):
     else:
         return {"status": "unknown"}
 
-# Manage requests for a server lease
+
 def server_lease(msg, addr):
+    """Manage requests for a server lease."""
     lockid = "%s:%s" % (addr, msg["port"])
     requestor = msg["requestor"]
 
@@ -92,12 +97,14 @@ def server_lease(msg, addr):
                     return {"status": "retry", "epoch": config["epoch"]}
     else:
         # lock not present yet
-        leases.append({"lockid": lockid, "requestor": requestor, "timestamp": time.time()})
+        leases.append({"lockid": lockid, "requestor": requestor,
+                       "timestamp": time.time()})
         config["epoch"] += 1
         return {"status": "ok", "epoch": config["epoch"]}
 
-# Check which leases have already expired
+
 def remove_expired_leases():
+    """Check which leases have already expired."""
     global leases
     expired = False
     new_leases = []
@@ -108,11 +115,12 @@ def remove_expired_leases():
             config["expired"].append(lease["requestor"])
             expired = True
     if expired:
-        config["epoch"] += 1 
+        config["epoch"] += 1
     leases = new_leases
 
-# Output the set of currently active servers
+
 def query_servers(msg, addr):
+    """Output the set of currently active servers."""
     servers = []
     remove_expired_leases()
     for lease in leases:
@@ -121,14 +129,17 @@ def query_servers(msg, addr):
 
     return {"result": servers, "epoch": config["epoch"]}
 
+
 def init(msg, addr):
+    """init."""
     return {}
 
 ##############
 # Main program
 
-# RPC dispatcher invokes appropriate function
+
 def handler(msg, addr):
+    """RPC dispatcher invokes appropriate function."""
     cmds = {
         "init": init,
         "heartbeat": server_lease,
@@ -139,9 +150,9 @@ def handler(msg, addr):
 
     return cmds[msg["cmd"]](msg, addr)
 
-# Server entry point
+
 def main():
- 
+    """Viewleader entry point."""
     for port in range(common2.VIEWLEADER_LOW, common2.VIEWLEADER_HIGH):
         print "Trying to listen on %s..." % port
         result = common.listen(port, handler)
