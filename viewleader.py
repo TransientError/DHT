@@ -3,6 +3,7 @@
 """Modified from phase 2."""
 
 import time
+import hashlib
 import common
 import common2
 
@@ -16,6 +17,9 @@ config = {
     # List of expired leases
     "expired": [],
 }
+
+# Server hashes
+hashes = []
 
 # Stores all server leases
 leases = []
@@ -85,6 +89,8 @@ def server_lease(msg, addr):
                     lease["timestamp"] = time.time()
                     lease["requestor"] = requestor
                     config["epoch"] += 1
+                    # add hash
+                    hashes.append(common.hash_number(requestor))
                     return {"status": "ok", "epoch": config["epoch"]}
             else:
                 # lease still active
@@ -100,6 +106,7 @@ def server_lease(msg, addr):
         leases.append({"lockid": lockid, "requestor": requestor,
                        "timestamp": time.time()})
         config["epoch"] += 1
+        hashes.append(common.hash_number(requestor))
         return {"status": "ok", "epoch": config["epoch"]}
 
 
@@ -113,6 +120,7 @@ def remove_expired_leases():
             new_leases.append(lease)
         else:
             config["expired"].append(lease["requestor"])
+            hashes.remove(common.hash_number(lease['requestor']))
             expired = True
     if expired:
         config["epoch"] += 1
