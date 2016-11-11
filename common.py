@@ -1,3 +1,5 @@
+"""Common modiefied from phase 2."""
+
 import json
 import socket
 import struct
@@ -5,8 +7,9 @@ import hashlib
 
 MAX_MESSAGE_SIZE = 8192
 
-# Encode and send a message on an open socket
+
 def send(sock, message):
+    """Encode and send a message on an open socket."""
     message = json.dumps(message).encode()
 
     nlen = len(message)
@@ -21,8 +24,9 @@ def send(sock, message):
 
     return {}
 
-# Expect a message on an open socket
+
 def receive(sock):
+    """Expect a message on an open socket."""
     nlen = sock.recv(4, socket.MSG_WAITALL)
     if not nlen:
         return {"error": "can't receive"}
@@ -34,7 +38,9 @@ def receive(sock):
 
     return json.loads(response.decode())
 
+
 def send_receive_range(host, port_low, port_high, message):
+    """Send an RPC and return the result."""
     for port in range(port_low, port_high):
         response = send_receive(host, port, message)
         if "error" in response:
@@ -45,14 +51,16 @@ def send_receive_range(host, port_low, port_high, message):
         return {"error": "can't connect to %s" % host}
 
 
-# Encapsulates the send/receive functionality of an RPC client
-# Parameters
-#   host, port - host and port to connect to
-#   message - arbitrary Python object to be sent as message
-# Return value
-#   Response received from server
-#   In case of error, returns a dict containing an "error" key
 def send_receive(host, port, message):
+    """Encapsulate the send/receive functionality of an RPC client.
+
+    Parameters
+        host, port - host and port to connect to
+        message - arbitrary Python object to be sent as message
+    Return value
+        Response received from server
+        In case of error, returns a dict containing an "error" key
+    """
     sock = None
     try:
         sock = socket.create_connection((host, port), 5)
@@ -74,23 +82,27 @@ def send_receive(host, port, message):
         if sock is not None:
             sock.close()
 
-# A simple RPC server
-# Parameters
-#   port - port number to listen on for all interfaces
-#   handler - function to handle respones, documented below
-#   timeout - if not None, after how many seconds to invoke timeout handler
-# Return value
-#   in case of error, returns a dict with "error" key
-#   otherwise, function does not return until timeout handler returns "abort"
-#
-# the handler function is invoked by the server in response
-# handler is passed a dict containing a "cmd" key indicating the event
-# the following are possible values of the "cmd" key:
-#    init: the port has been bound, please perform server initializiation
-#    timeout: timeout occurred
-#    anything else: RPC command received
-# the return value of the handler function is sent as an RPC response
+
 def listen(port, handler, timeout=None):
+    """A simple RPC server.
+
+    Parameters
+        port - port number to listen on for all interfaces
+        handler - function to handle respones, documented below
+        timeout - if not None, after how many seconds to invoke timeout handler
+    Return value
+        in case of error, returns a dict with "error" key
+        otherwise, function does not return until timeout handler returns
+        "abort"
+
+    The handler function is invoked by the server in response
+    handler is passed a dict containing a "cmd" key indicating the event
+    the following are possible values of the "cmd" key:
+      init: the port has been bound, please perform server initializiation
+      timeout: timeout occurred
+      anything else: RPC command received
+    the return value of the handler function is sent as an RPC response
+    """
     bindsock = None
     try:
         bindsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -99,7 +111,7 @@ def listen(port, handler, timeout=None):
         if timeout:
             bindsock.settimeout(timeout)
 
-        if "abort" in handler({"cmd":"init", "port": port}, None):
+        if "abort" in handler({"cmd": "init", "port": port}, None):
             return {"error": "listen: abort in init"}
 
         sock = None
@@ -140,7 +152,7 @@ def listen(port, handler, timeout=None):
                 sock.sendall(slen)
                 sock.sendall(json_response)
             except socket.timeout:
-                if "abort" in handler({"cmd":"timeout"}, None):
+                if "abort" in handler({"cmd": "timeout"}, None):
                     return {"error": "listen: abort in timeout"}
             except ValueError as e:
                 print "listen: json encoding error %s" % e
@@ -154,3 +166,9 @@ def listen(port, handler, timeout=None):
     finally:
         if bindsock is not None:
             bindsock.close()
+
+
+def hash_number(r):
+    """Return hash of a number."""
+    hashed = hashlib.sha1(r)
+    return int(str(hashed.hexadigit()), 16)
