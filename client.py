@@ -36,9 +36,14 @@ def main():
     parser_lock_get.add_argument('lockid', type=str)
     parser_lock_get.add_argument('requestor', type=str)
 
+    parser_setr = subparsers.add_parser('setr')
+    parser_setr.add_argument('key', type=str)
+    parser_setr.add_argument('val', type=str)
+
     args = parser.parse_args()
 
-    if args.cmd in ['query_servers', 'lock_get', 'lock_release']:
+    if args.cmd in ['query_servers', 'lock_get', 'lock_release', 'setr',
+                    'getr']:
         while True:
             response = common.send_receive_range(args.viewleader,
                                                  common2.VIEWLEADER_LOW,

@@ -171,4 +171,4 @@ def listen(port, handler, timeout=None):
 def hash_number(r):
     """Return hash of a number."""
     hashed = hashlib.sha1(r)
-    return int(str(hashed.hexadigit()), 16)
+    return int(str(hashed.hexdigest()), 16)

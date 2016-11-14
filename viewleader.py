@@ -13,22 +13,52 @@ import common2
 # Stores global configuration variables
 config = {
     "epoch": 0,
-
+    "lowest_hash": (None),
     # List of expired leases
-    "expired": [],
+    "expired": []
 }
 
-# Server hashes
-hashes = []
-
-# Stores all server leases
+# Stores all server leases, entries have form:
+# {"lockid": lockid,
+#  "requestor": requestor,
+#  "timestamp": time.time(),
+#  'hash': common.hash_number(requestor)}
 leases = []
 
 # Store all locks
 locks = []
 
 ###################
+def set_val(lockid, val):
+    svr_addr, svr_port = lockid.split(':')
+    print svr_addr
+    print svr_port
+###################
 # RPC implementations
+
+
+def setr(msg, addr):
+    """replicated set."""
+    key, val = msg['key'], msg['val']
+    key_hash = common.hash_number(key)
+    print leases
+    hashes = sorted([(entry['hash'], entry['lockid']) for entry in leases])
+    print hashes
+    value_set = False
+    for hash_ in hashes:
+        if key_hash < hash_[0]:
+            pass
+        else:
+            value_set = True
+            set_val(hash_[1], val)
+    if not value_set:
+        set_val(config['lowest_hash'][1], val)
+    return {}
+
+
+def getr(msg, addr):
+    """replicated get."""
+    pass
 
 
 def lock_get(msg, addr):
@@ -88,9 +118,13 @@ def server_lease(msg, addr):
                     # another server at same address is okay
                     lease["timestamp"] = time.time()
                     lease["requestor"] = requestor
-                    config["epoch"] += 1
                     # add hash
-                    hashes.append(common.hash_number(requestor))
+                    hash_ = common.hash_number(str(requestor))
+                    low = config['lowest_hash']
+                    if not low or hash_ < low[0]:
+                        config['lowest_hash'] = (hash_, lockid)
+                    lease['hash'] = hash_
+                    config["epoch"] += 1
                     return {"status": "ok", "epoch": config["epoch"]}
             else:
                 # lease still active
@@ -103,10 +137,14 @@ def server_lease(msg, addr):
                     return {"status": "retry", "epoch": config["epoch"]}
     else:
         # lock not present yet
+        hash_ = common.hash_number(str(requestor))
+        low = config['lowest_hash']
+        if not low or hash_ < low[0]:
+            config['lowest_hash'] = (hash_, lockid)
         leases.append({"lockid": lockid, "requestor": requestor,
-                       "timestamp": time.time()})
+                       "timestamp": time.time(),
+                       'hash': hash_})
         config["epoch"] += 1
-        hashes.append(common.hash_number(requestor))
         return {"status": "ok", "epoch": config["epoch"]}
 
 
@@ -120,7 +158,6 @@ def remove_expired_leases():
             new_leases.append(lease)
         else:
             config["expired"].append(lease["requestor"])
-            hashes.remove(common.hash_number(lease['requestor']))
             expired = True
     if expired:
         config["epoch"] += 1
@@ -150,6 +187,8 @@ def handler(msg, addr):
     """RPC dispatcher invokes appropriate function."""
     cmds = {
         "init": init,
+        "setr": setr,
+        "getr": getr,
         "heartbeat": server_lease,
         "query_servers": query_servers,
         "lock_get": lock_get,
