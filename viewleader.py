@@ -29,10 +29,28 @@ leases = []
 locks = []
 
 ###################
-def set_val(lockid, val):
+
+
+def set_val(lockid, key, val):
+    """set value on a server."""
     svr_addr, svr_port = lockid.split(':')
-    print svr_addr
-    print svr_port
+    msg = {'cmd': 'set', 'key': key, 'val': val}
+    return common.send_receive(svr_addr, svr_port, msg)
+
+
+def find_svrs(key, hashes):
+    """find the servers to set in."""
+    key_hash = common.hash_number(key)
+    len_ = len(hashes)
+    if len_ > 3:
+        for i in len_:
+            if key_hash < hashes[i][0]:
+                pass
+            else:
+                return (hashes[i], hashes[i + 1 % len_], hashes[i + 2 % len_])
+        return hashes[:2]
+    else:
+        return hashes
 ###################
 # RPC implementations
 
@@ -40,20 +58,15 @@ def set_val(lockid, val):
 def setr(msg, addr):
     """replicated set."""
     key, val = msg['key'], msg['val']
-    key_hash = common.hash_number(key)
-    print leases
     hashes = sorted([(entry['hash'], entry['lockid']) for entry in leases])
-    print hashes
-    value_set = False
-    for hash_ in hashes:
-        if key_hash < hash_[0]:
-            pass
-        else:
-            value_set = True
-            set_val(hash_[1], val)
-    if not value_set:
-        set_val(config['lowest_hash'][1], val)
-    return {}
+    svrs = [svr[1] for svr in find_svrs(key, hashes)]
+    ress = [set_val(svr, key, val) for svr in svrs]
+    for res in ress:
+        try:
+            assert res['status'] == 'ok'
+        except AssertionError:
+            return {'error': 'set failed for a server in setr'}
+    return {'status': 'ok'}
 
 
 def getr(msg, addr):
@@ -119,11 +132,7 @@ def server_lease(msg, addr):
                     lease["timestamp"] = time.time()
                     lease["requestor"] = requestor
                     # add hash
-                    hash_ = common.hash_number(str(requestor))
-                    low = config['lowest_hash']
-                    if not low or hash_ < low[0]:
-                        config['lowest_hash'] = (hash_, lockid)
-                    lease['hash'] = hash_
+                    lease['hash'] = common.hash_number(str(requestor))
                     config["epoch"] += 1
                     return {"status": "ok", "epoch": config["epoch"]}
             else:
@@ -137,13 +146,9 @@ def server_lease(msg, addr):
                     return {"status": "retry", "epoch": config["epoch"]}
     else:
         # lock not present yet
-        hash_ = common.hash_number(str(requestor))
-        low = config['lowest_hash']
-        if not low or hash_ < low[0]:
-            config['lowest_hash'] = (hash_, lockid)
         leases.append({"lockid": lockid, "requestor": requestor,
                        "timestamp": time.time(),
-                       'hash': hash_})
+                       'hash': common.hash_number(str(requestor))})
         config["epoch"] += 1
         return {"status": "ok", "epoch": config["epoch"]}
 
