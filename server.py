@@ -105,7 +105,7 @@ def setr_request(msg, addr):
         return {'reply': 'no'}
     else:
         keys.append(key)
-        return {'reply': 'ok'}
+        return {'reply': 'ok', 'epoch': config['epoch']}
 
 
 def setr(msg, addr):

@@ -49,7 +49,7 @@ def find_svrs(key, hashes):
             if key_hash < hashes[i][0]:
                 pass
             else:
-                return (hashes[i], hashes[i + 1 % len_], hashes[i + 2 % len_])
+                return [hashes[i], hashes[(i + 1) % len_], hashes[(i + 2) % len_]]
         return hashes[:2]
     else:
         return hashes
@@ -84,11 +84,14 @@ def setr(msg, addr):
     """replicated set."""
     key, val = msg['key'], msg['val']
     hashes = sorted([(entry['hash'], entry['lockid']) for entry in leases])
-    print hashes
     svrs = [svr[1] for svr in find_svrs(key, hashes)]
     print svrs
-    ress = [setr_request(svr, key)['reply'] for svr in svrs]
-    if 'no' in ress:
+    ress = [setr_request(svr, key) for svr in svrs]
+    # we iterate through ress twice, which is a bit inefficient, but ress
+    # should only be around 3 items, so it should be ok.
+    if 'no' in [res['reply'] for res in ress]:
+        res = setr_deny(svrs, key)
+    elif any([res['epoch'] != config['epoch'] for res in ress]):
         res = setr_deny(svrs, key)
     else:
         res = setr_accept(svrs, key, val)
@@ -200,7 +203,7 @@ def query_servers(msg, addr):
     servers = []
     remove_expired_leases()
     for lease in leases:
-        ip = lease["lockid"]
+        ip = lease["lockid"], lease['hash']
         servers.append(ip)
 
     return {"result": servers, "epoch": config["epoch"]}
