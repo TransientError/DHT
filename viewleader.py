@@ -49,7 +49,8 @@ def find_svrs(key, hashes):
             if key_hash < hashes[i][0]:
                 pass
             else:
-                return [hashes[i], hashes[(i + 1) % len_], hashes[(i + 2) % len_]]
+                return [hashes[i], hashes[(i + 1) % len_],
+                        hashes[(i + 2) % len_]]
         return hashes[:2]
     else:
         return hashes
