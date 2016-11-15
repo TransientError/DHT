@@ -34,7 +34,8 @@ locks = []
 def set_val(lockid, key, val):
     """set value on a server."""
     svr_addr, svr_port = lockid.split(':')
-    msg = {'cmd': 'set', 'key': key, 'val': val}
+    msg = {'cmd': 'setr', 'key': key, 'val': val}
+    print 'set %s to %s' % (key, val)
     return common.send_receive(svr_addr, svr_port, msg)
 
 
@@ -42,8 +43,9 @@ def find_svrs(key, hashes):
     """find the servers to set in."""
     key_hash = common.hash_number(key)
     len_ = len(hashes)
+    print len_
     if len_ > 3:
-        for i in len_:
+        for i in xrange(len_):
             if key_hash < hashes[i][0]:
                 pass
             else:
@@ -51,6 +53,29 @@ def find_svrs(key, hashes):
         return hashes[:2]
     else:
         return hashes
+
+
+def setr_request(lockid, key):
+    """Request votes from servers."""
+    svr_addr, svr_port = lockid.split(':')
+    msg = {'cmd': 'setr_request', 'key': key}
+    return common.send_receive(svr_addr, svr_port, msg)
+
+
+def setr_deny(svrs, key):
+    """setr not successful."""
+    deny = {'cmd': 'setr_deny', 'key': key}
+    for svr in svrs:
+        svr_addr, svr_port = svr.split(':')
+        common.send_receive(svr_addr, svr_port, deny)
+    return {'status': 'setr not successful'}
+
+
+def setr_accept(svrs, key, val):
+    """setr successful."""
+    for svr in svrs:
+        set_val(svr, key, val)
+    return {'status': 'setr successful'}
 ###################
 # RPC implementations
 
@@ -59,14 +84,15 @@ def setr(msg, addr):
     """replicated set."""
     key, val = msg['key'], msg['val']
     hashes = sorted([(entry['hash'], entry['lockid']) for entry in leases])
+    print hashes
     svrs = [svr[1] for svr in find_svrs(key, hashes)]
-    ress = [set_val(svr, key, val) for svr in svrs]
-    for res in ress:
-        try:
-            assert res['status'] == 'ok'
-        except AssertionError:
-            return {'error': 'set failed for a server in setr'}
-    return {'status': 'ok'}
+    print svrs
+    ress = [setr_request(svr, key)['reply'] for svr in svrs]
+    if 'no' in ress:
+        res = setr_deny(svrs, key)
+    else:
+        res = setr_accept(svrs, key, val)
+    return res
 
 
 def getr(msg, addr):

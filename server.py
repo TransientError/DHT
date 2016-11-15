@@ -16,8 +16,11 @@ config = {"epoch": None,
           "server_hash": random.random(),
           "last_heartbeat": None}
 
-# Stores shared values for get and se commands
+# Stores shared values for get and set commands
 store = {}
+
+# Keys waiting commit
+keys = []
 
 
 def update_lease():
@@ -94,6 +97,28 @@ def tick(msg, addr):
     """accept timed out - nop."""
     return {}
 
+
+def setr_request(msg, addr):
+    """Vote for setr."""
+    key = msg['key']
+    if key in keys:
+        return {'reply': 'no'}
+    else:
+        keys.append(key)
+        return {'reply': 'ok'}
+
+
+def setr(msg, addr):
+    """Successfully set."""
+    set_val(msg, addr)
+    keys.remove(msg['key'])
+    return {}
+
+
+def setr_deny(msg, addr):
+    """Cancel setr."""
+    keys.remove(msg['key'])
+    return {}
 ##############
 # Main program
 
@@ -107,6 +132,9 @@ def handler(msg, addr):
         "print": print_something,
         "query_all_keys": query_all_keys,
         "timeout": tick,
+        'setr_request': setr_request,
+        'setr': setr,
+        'setr_deny': setr_deny
     }
     res = cmds[msg["cmd"]](msg, addr)
 
