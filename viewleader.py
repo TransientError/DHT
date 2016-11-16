@@ -46,53 +46,6 @@ def arc(index, low, high, list_):
         return list_[:index1 + 1] + list_[index2:index1]
 
 
-def set_val(lockid, key, val):
-    """set value on a server."""
-    svr_addr, svr_port = lockid.split(':')
-    msg = {'cmd': 'setr', 'key': key, 'val': val}
-    print 'set %s to %s' % (key, val)
-    return common.send_receive(svr_addr, svr_port, msg)
-
-
-def find_svrs(key, hashes):
-    """find the servers to set in."""
-    key_hash = common.hash_number(key)
-    len_ = len(hashes)
-    if len_ > 3:
-        for i in xrange(len_):
-            if key_hash < hashes[i][0]:
-                pass
-            else:
-                return [hashes[i], hashes[(i + 1) % len_],
-                        hashes[(i + 2) % len_]]
-        return hashes[:3]
-    else:
-        return hashes
-
-
-def setr_request(lockid, key):
-    """Request votes from servers."""
-    svr_addr, svr_port = lockid.split(':')
-    msg = {'cmd': 'setr_request', 'key': key}
-    return common.send_receive(svr_addr, svr_port, msg)
-
-
-def setr_deny(svrs, key):
-    """setr not successful."""
-    deny = {'cmd': 'setr_deny', 'key': key}
-    for svr in svrs:
-        svr_addr, svr_port = svr.split(':')
-        common.send_receive(svr_addr, svr_port, deny)
-    return {'status': 'setr not successful'}
-
-
-def setr_accept(svrs, key, val):
-    """setr successful."""
-    for svr in svrs:
-        set_val(svr, key, val)
-    return {'status': 'setr successful'}
-
-
 def rebalance_request(keys, origin, dests):
     """Request to send keys from servers to a server."""
     success = False
@@ -179,27 +132,6 @@ def add_lease(leases, lockid, requestor):
     return sorted(leases, key=lambda d: d['hash'])
 ###################
 # RPC implementations
-
-
-def setr(msg, addr):
-    """Deprecated Replicated set."""
-    key, val = msg['key'], msg['val']
-    print 'Trying to setr %s to %s' % (key, val)
-    hashes = [(entry['hash'], entry['lockid']) for entry in leases]
-    # list just the lockids
-    svrs = [svr[1] for svr in find_svrs(key, hashes)]
-    ress = [setr_request(svr, key) for svr in svrs]
-    # we iterate through ress twice, which is a bit inefficient, but ress
-    # should only be around 3 items, so it should be ok.
-    if 'no' in [res['reply'] for res in ress]:
-        res = setr_deny(svrs, key)
-        print 'key already being set'
-    elif any([res['epoch'] != config['epoch'] for res in ress]):
-        res = setr_deny(svrs, key)
-        print 'server with wrong epoch'
-    else:
-        res = setr_accept(svrs, key, val)
-    return res
 
 
 def getr(msg, addr):
