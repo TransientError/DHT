@@ -4,6 +4,7 @@
 
 import time
 import hashlib
+import socket
 import common
 import common2
 
@@ -13,12 +14,11 @@ import common2
 # Stores global configuration variables
 config = {
     "epoch": 0,
-    "lowest_hash": (None),
     # List of expired leases
     "expired": []
 }
 
-# Stores all server leases, entries have form:
+# Stores all server leases sorted by hash, entries have form:
 # {"lockid": lockid,
 #  "requestor": requestor,
 #  "timestamp": time.time(),
@@ -77,6 +77,25 @@ def setr_accept(svrs, key, val):
     for svr in svrs:
         set_val(svr, key, val)
     return {'status': 'setr successful'}
+
+
+def rebalancing_lost():
+    """Rebalance the keys and values when a server is lost."""
+
+
+def rebalancing_new():
+    """Rebalance the keys and values when there is a new server."""
+
+
+def add_lease(leases, lockid, requestor):
+    """Add new lease to leases."""
+    leases.append({"lockid": lockid, "requestor": requestor,
+                   "timestamp": time.time(),
+                   'hash': common.hash_number(str(requestor))})
+    # keep leases sorted to keep setr cost down
+    # I'm not sure what algorithm python uses, but I think insertion sort
+    # would be best here.
+    return sorted(leases, key=lambda d: d['hash'])
 ###################
 # RPC implementations
 
@@ -84,7 +103,9 @@ def setr_accept(svrs, key, val):
 def setr(msg, addr):
     """replicated set."""
     key, val = msg['key'], msg['val']
-    hashes = sorted([(entry['hash'], entry['lockid']) for entry in leases])
+    hashes = [(entry['hash'], entry['lockid']) for entry in leases]
+    print hashes
+    # list just the lockids
     svrs = [svr[1] for svr in find_svrs(key, hashes)]
     print svrs
     ress = [setr_request(svr, key) for svr in svrs]
@@ -101,7 +122,19 @@ def setr(msg, addr):
 
 def getr(msg, addr):
     """replicated get."""
-    pass
+    key = msg['key']
+    hashes = [(entry['hash'], entry['lockid']) for entry in leases]
+    print hashes
+    # list the lockids
+    svrs = [svr[1] for svr in find_svrs(key, hashes)]
+    for svr in svrs:
+        host, port = svr.split(':')
+        new_msg = {'cmd': 'get', 'key': key}
+        try:
+            return common.send_receive(host, port, new_msg)
+        except socket.Timeouterror:
+            pass
+    return {'status': 'unable to retrieve %s from any server' % key}
 
 
 def lock_get(msg, addr):
@@ -161,8 +194,13 @@ def server_lease(msg, addr):
                     # another server at same address is okay
                     lease["timestamp"] = time.time()
                     lease["requestor"] = requestor
-                    # add hash
+                    # add hash and resort leases
                     lease['hash'] = common.hash_number(str(requestor))
+                    # This seems suspicious because I am changing leases as
+                    # I'm iterating through it, but I exit right away, so
+                    # it should be fine.
+                    global leases
+                    leases = sorted(leases, key=lambda d: d['hash'])
                     config["epoch"] += 1
                     return {"status": "ok", "epoch": config["epoch"]}
             else:
@@ -176,9 +214,7 @@ def server_lease(msg, addr):
                     return {"status": "retry", "epoch": config["epoch"]}
     else:
         # lock not present yet
-        leases.append({"lockid": lockid, "requestor": requestor,
-                       "timestamp": time.time(),
-                       'hash': common.hash_number(str(requestor))})
+        leases = add_lease(leases, lockid, requestor)
         config["epoch"] += 1
         return {"status": "ok", "epoch": config["epoch"]}
 

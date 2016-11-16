@@ -40,6 +40,9 @@ def main():
     parser_setr.add_argument('key', type=str)
     parser_setr.add_argument('val', type=str)
 
+    parser_getr = subparsers.add_parser('getr')
+    parser_getr.add_argument('key', type=str)
+
     args = parser.parse_args()
 
     if args.cmd in ['query_servers', 'lock_get', 'lock_release', 'setr',
