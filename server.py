@@ -83,7 +83,7 @@ def get_val(msg, addr):
 def query_all_keys(msg, addr):
     """Return all keys in the value store."""
     print "Returning all keys"
-    keyvers = [key for key in store.keys()]
+    keyvers = store.keys()
     return {"result": keyvers}
 
 

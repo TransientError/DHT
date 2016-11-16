@@ -61,6 +61,7 @@ def send_receive(host, port, message):
         Response received from server
         In case of error, returns a dict containing an "error" key
     """
+    port = int(port)
     sock = None
     try:
         sock = socket.create_connection((host, port), 5)
@@ -107,7 +108,7 @@ def listen(port, handler, timeout=None):
     try:
         bindsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         bindsock.bind(('', port))
-        bindsock.listen(1)
+        bindsock.listen(3)
         if timeout:
             bindsock.settimeout(timeout)
 
