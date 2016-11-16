@@ -2,9 +2,11 @@
 """Client code modified from phase 2."""
 
 import argparse
+import socket
 import common
 import common2
 import time
+
 
 def set_val(lockid, key, val):
     """set value on a server."""
@@ -129,6 +131,25 @@ def main():
         else:
             res = setr_accept(svrs, key, val)
         return res
+    elif args.cmd == 'getr':
+        key = args.key
+        msg = common.send_receive_range(args.viewleader,
+                                        common2.VIEWLEADER_LOW,
+                                        common2.VIEWLEADER_HIGH,
+                                        {'cmd': 'query_servers'})
+        # results are lockid, hash
+        hashes = [(entry[1], entry[0]) for entry in msg['result']]
+        # list the lockids
+        svrs = [svr[1] for svr in find_svrs(key, hashes)]
+        for svr in svrs:
+            host, port = svr.split(':')
+            new_msg = {'cmd': 'get', 'key': key}
+            try:
+                print common.send_receive(host, port, new_msg)
+                break
+            except socket.Timeouterror:
+                pass
+                print {'status': 'unable to retrieve %s from any server' % key}
     else:
         response = common.send_receive_range(args.server, common2.SERVER_LOW,
                                              common2.SERVER_HIGH, vars(args))
