@@ -134,23 +134,6 @@ def add_lease(leases, lockid, requestor):
 # RPC implementations
 
 
-def getr(msg, addr):
-    """replicated get."""
-    key = msg['key']
-    hashes = [(entry['hash'], entry['lockid']) for entry in leases]
-    print hashes
-    # list the lockids
-    svrs = [svr[1] for svr in find_svrs(key, hashes)]
-    for svr in svrs:
-        host, port = svr.split(':')
-        new_msg = {'cmd': 'get', 'key': key}
-        try:
-            return common.send_receive(host, port, new_msg)
-        except socket.Timeouterror:
-            pass
-    return {'status': 'unable to retrieve %s from any server' % key}
-
-
 def lock_get(msg, addr):
     """Try to acquire a lock."""
     lockid = msg["lockid"]
